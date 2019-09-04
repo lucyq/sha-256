@@ -545,41 +545,74 @@ void printstr(const char *str, int len)
 }
 
 
-int main() {
-
+void testInput(const char* inputArray, char* outputArray, int inputLen) {
   static const char hexdigits[ ] = "0123456789ABCDEF";
 
-  SHA256Context sha;
-  const char *testarray = "TESTING!";
-  int err;
   uint8_t Message_Digest_Buf[USHAMaxHashSize];
   uint8_t *Message_Digest = Message_Digest_Buf;
+  SHA256Context sha;
+  int err;
+  char hashResult[64];
+  int count = 0;
 
-
+  // initialize
   SHA256Reset(&sha);
-  err = SHA256Input(&sha, (const uint8_t*)testarray, 8);
 
-
+  // input
+  err = SHA256Input(&sha, (const uint8_t*)inputArray, inputLen);
   if (err != shaSuccess) {
     printf("Error: input!\n");
-  } else {
-    printf("Success: input!\n");
   }
-
+  // finalize
   err = SHA256Result(&sha, Message_Digest);
 
   if (err != shaSuccess) {
     printf("Error: result!\n");
-  } else {
-    printf("Success: result!\n");
   }
 
-  for(int i = 0; i < 65; i++) {
+  // test result
+
+  for(int i = 0; i < 32; i++) {
     putchar(hexdigits[(Message_Digest[i] >> 4) & 0xF]);
+    hashResult[count] = hexdigits[(Message_Digest[i] >> 4) & 0xF];
+    count++;
     putchar(hexdigits[Message_Digest[i] & 0xF]);
-    putchar(' ');
-
+    hashResult[count] = hexdigits[Message_Digest[i] & 0xF];
+    count++;
   }
+  printf("\n");
+
+
+  for (int i = 0; i < 64; i++) {
+    if (outputArray[i] != hashResult[i]) {
+      printf("OUTPUT ERROR!!!!!\n");
+      return;
+    }
+  }
+
+  printf("Output was correct!\n");
+  return;
+}
+
+int main() {
+
+  printf("testing: %s\n", "TESTING!\n");
+  char output1[64] = "1CFFE26786771001CF767FC7C0CE1C3029060238D3225EA0C9EDE740954EA892";
+  testInput("TESTING!", (char*)output1, 8);
+
+  printf("testing: %s\n", "abc");
+  char output2[64] = "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD";
+  testInput("abc", (char*)output2, 3);
+
+  printf("testing: %s\n", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+  char output3[64] = "248D6A61D20638B8E5C026930C3E6039A33CE45964FF2167F6ECEDD419DB06C1";
+  testInput("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", output3, 56);
+
+  printf("testing: %s\n", "asdfj8;lkas");
+  char output4[64] = "C252FBD383BE8A9BC8F66FB5EFE850E18F42AE94DB963417ADF3C8694358580A";
+  testInput("asdfj8;lkas", (char*)output4, 11);
+
+
 
   return 0;
 }
