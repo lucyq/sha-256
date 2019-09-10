@@ -58,6 +58,7 @@ static uint32_t SHA256_H0[SHA256HashSize/4] = {
 };
 
 
+
 /*
  * SHA256Reset
  *
@@ -490,24 +491,494 @@ void testInput(const char* inputArray, char* outputArray, int inputLen) {
   printf("Output was correct!\n");
   return;
 }
+
+
+/* * * * * * *
+ *  U S H A  *
+ * * * * * * */
+
+/*
+ *  USHAReset
+ *
+ *  Description:
+ *      This function will initialize the SHA Context in preparation
+ *      for computing a new SHA message digest.
+ *
+ *  Parameters:
+ *      context: [in/out]
+ *          The context to reset.
+ *      whichSha: [in]
+ *          Selects which SHA reset to call
+ *
+ *  Returns:
+ *      sha Error Code.
+ *
+ */
+int USHAReset(USHAContext *ctx, enum SHAversion whichSha)
+{
+  if (ctx) {
+    ctx->whichSha = whichSha;
+    switch (whichSha) {
+      case SHA256: return SHA256Reset((SHA256Context*)&ctx->ctx);
+      default: return shaBadParam;
+    }
+  } else {
+    return shaNull;
+  }
+}
+
+/*
+ *  USHAInput
+ *
+ *  Description:
+ *      This function accepts an array of octets as the next portion
+ *      of the message.
+ *
+ *  Parameters:
+ *      context: [in/out]
+ *          The SHA context to update
+ *      message_array: [in]
+ *          An array of characters representing the next portion of
+ *          the message.
+ *      length: [in]
+ *          The length of the message in message_array
+ *
+ *  Returns:
+ *      sha Error Code.
+ *
+ */
+int USHAInput(USHAContext *ctx,
+              const uint8_t *bytes, unsigned int bytecount)
+{
+  if (ctx) {
+    switch (ctx->whichSha) {
+      case SHA256:
+        return SHA256Input((SHA256Context*)&ctx->ctx, bytes,
+            bytecount);
+      default: return shaBadParam;
+    }
+  } else {
+    return shaNull;
+  }
+}
+
+/*
+ * USHAFinalBits
+ *
+ * Description:
+ *   This function will add in any final bits of the message.
+ *
+ * Parameters:
+ *   context: [in/out]
+ *     The SHA context to update
+ *   message_bits: [in]
+ *     The final bits of the message, in the upper portion of the
+ *     byte. (Use 0b###00000 instead of 0b00000### to input the
+ *     three bits ###.)
+ *   length: [in]
+ *     The number of bits in message_bits, between 1 and 7.
+ *
+ * Returns:
+ *   sha Error Code.
+ */
+int USHAFinalBits(USHAContext *ctx,
+                  const uint8_t bits, unsigned int bitcount)
+{
+  if (ctx) {
+    switch (ctx->whichSha) {
+      case SHA256:
+        return SHA256FinalBits((SHA256Context*)&ctx->ctx, bits,
+            bitcount);
+      default: return shaBadParam;
+    }
+  } else {
+    return shaNull;
+  }
+}
+
+/*
+ * USHAResult
+ * * Description:
+ *   This function will return the 160-bit message digest into the
+ *   Message_Digest array provided by the caller.
+ *   NOTE: The first octet of hash is stored in the 0th element,
+ *      the last octet of hash in the 19th element.
+ *
+ * Parameters:
+ *   context: [in/out]
+ *     The context to use to calculate the SHA-1 hash.
+ *   Message_Digest: [out]
+ *     Where the digest is returned.
+ *
+ * Returns:
+ *   sha Error Code.
+ *
+ */
+int USHAResult(USHAContext *ctx,
+               uint8_t Message_Digest[USHAMaxHashSize])
+{
+  if (ctx) {
+    switch (ctx->whichSha) {
+      case SHA256:
+        return SHA256Result((SHA256Context*)&ctx->ctx, Message_Digest);
+    }
+  } 
+  return shaNull;
+}
+
+/*
+ * USHABlockSize
+ *
+ * Description:
+ *   This function will return the blocksize for the given SHA
+ *   algorithm.
+ *
+ * Parameters:
+ *   whichSha:
+ *     which SHA algorithm to query
+ *
+ * Returns:
+ *   block size
+ *
+ */
+int USHABlockSize(enum SHAversion whichSha)
+{
+  switch (whichSha) {
+    default:
+    case SHA256: return SHA256_Message_Block_Size;
+  }
+}
+
+/*
+ * USHAHashSize
+ *
+ * Description:
+ *   This function will return the hashsize for the given SHA
+ *   algorithm.
+ *
+ * Parameters:
+ *   whichSha:
+ *     which SHA algorithm to query
+ *
+ * Returns:
+ *   hash size
+ *
+ */
+int USHAHashSize(enum SHAversion whichSha)
+{
+  switch (whichSha) {
+    default:
+    case SHA256: return SHA256HashSize;
+  }
+}
+
+/*
+ * USHAHashSizeBits
+ *
+ * Description:
+ *   This function will return the hashsize for the given SHA
+ *   algorithm, expressed in bits.
+ *
+ * Parameters:
+ *   whichSha:
+ *     which SHA algorithm to query
+ *
+ * Returns:
+ *   hash size in bits
+ *
+ */
+int USHAHashSizeBits(enum SHAversion whichSha)
+{
+  switch (whichSha) {
+    default:
+    case SHA256: return SHA256HashSizeBits;
+  }
+}
+
+
+
+/* * * * * * *
+ *  H M A C  *
+ * * * * * * */
+
+/*
+ *  hmac
+ *
+ *  Description:
+ *      This function will compute an HMAC message digest.
+ *
+ *  Parameters:
+ *      whichSha: [in]
+ *          One of SHA1, SHA224, SHA256, SHA384, SHA512
+ *      message_array[ ]: [in]
+ *          An array of octets representing the message.
+ *          Note: in RFC 2104, this parameter is known
+ *          as 'text'.
+ *      length: [in]
+ *          The length of the message in message_array.
+ *      key[ ]: [in]
+ *          The secret shared key.
+ *      key_len: [in]
+ *          The length of the secret shared key.
+ *      digest[ ]: [out]
+ *          Where the digest is to be returned.
+ *          NOTE: The length of the digest is determined by
+ *              the value of whichSha.
+  *  Returns:
+ *      sha Error Code.
+ *
+ */
+
+int hmac(SHAversion whichSha,
+    const unsigned char *message_array, int length,
+    const unsigned char *key, int key_len,
+    uint8_t digest[USHAMaxHashSize])
+{
+  HMACContext context;
+  return hmacReset(&context, whichSha, key, key_len) ||
+         hmacInput(&context, message_array, length) ||
+         hmacResult(&context, digest);
+}
+
+/*
+ *  hmacReset
+ *
+ *  Description:
+ *      This function will initialize the hmacContext in preparation
+ *      for computing a new HMAC message digest.
+ *
+ *  Parameters:
+ *      context: [in/out]
+ *          The context to reset.
+ *      whichSha: [in]
+ *          One of SHA1, SHA224, SHA256, SHA384, SHA512
+ *      key[ ]: [in]
+ *          The secret shared key.
+ *      key_len: [in]
+ *          The length of the secret shared key.
+ *
+ *  Returns:
+ *      sha Error Code.
+ *
+ */
+int hmacReset(HMACContext *context, enum SHAversion whichSha,
+    const unsigned char *key, int key_len)
+{
+  int i, blocksize, hashsize, ret;
+
+  /* inner padding - key XORd with ipad */
+  unsigned char k_ipad[USHA_Max_Message_Block_Size];
+
+  /* temporary buffer when keylen > blocksize */
+  unsigned char tempkey[USHAMaxHashSize];
+  if (!context) return shaNull;
+  context->Computed = 0;
+  context->Corrupted = shaSuccess;
+
+  blocksize = context->blockSize = USHABlockSize(whichSha);
+  hashsize = context->hashSize = USHAHashSize(whichSha);
+  context->whichSha = whichSha;
+
+  /*
+   * If key is longer than the hash blocksize,
+   * reset it to key = HASH(key).
+   */
+  if (key_len > blocksize) {
+    USHAContext tcontext;
+    int err = USHAReset(&tcontext, whichSha) ||
+              USHAInput(&tcontext, key, key_len) ||
+              USHAResult(&tcontext, tempkey);
+    if (err != shaSuccess) return err;
+
+    key = tempkey;
+    key_len = hashsize;
+  }
+
+  /*
+   * The HMAC transform looks like:
+   *
+   * SHA(K XOR opad, SHA(K XOR ipad, text))
+   *
+   * where K is an n byte key, 0-padded to a total of blocksize bytes,
+   * ipad is the byte 0x36 repeated blocksize times,
+   * opad is the byte 0x5c repeated blocksize times,
+   * and text is the data being protected.
+   */
+
+  /* store key into the pads, XOR'd with ipad and opad values */
+  for (i = 0; i < key_len; i++) {
+    k_ipad[i] = key[i] ^ 0x36;
+    context->k_opad[i] = key[i] ^ 0x5c;
+  }
+  /* remaining pad bytes are '\0' XOR'd with ipad and opad values */
+  for ( ; i < blocksize; i++) {
+    k_ipad[i] = 0x36;
+    context->k_opad[i] = 0x5c;
+  }
+
+  /* perform inner hash */
+  /* init context for 1st pass */
+  ret = USHAReset(&context->shaContext, whichSha) ||
+      /* and start with inner pad */
+        USHAInput(&context->shaContext, k_ipad, blocksize);
+  return context->Corrupted = ret;
+}
+
+/*
+ *  hmacInput
+ *
+ *  Description:
+ *      This function accepts an array of octets as the next portion
+ *      of the message.  It may be called multiple times.
+ *
+ *  Parameters:
+ *      context: [in/out]
+ *          The HMAC context to update.
+ *      text[ ]: [in]
+ *          An array of octets representing the next portion of
+ *          the message.
+ *      text_len: [in]
+ *          The length of the message in text.
+ *
+ *  Returns:
+ *      sha Error Code.
+ *
+ */
+int hmacInput(HMACContext *context, const unsigned char *text,
+    int text_len)
+{
+  if (!context) return shaNull;
+  if (context->Corrupted) return context->Corrupted;
+  if (context->Computed) return context->Corrupted = shaStateError;
+  /* then text of datagram */
+  return context->Corrupted =
+    USHAInput(&context->shaContext, text, text_len);
+}
+
+/*
+ * hmacFinalBits
+ *
+ * Description:
+ *   This function will add in any final bits of the message.
+ *
+ * Parameters:
+ *   context: [in/out]
+ *     The HMAC context to update.
+ *   message_bits: [in]
+ *     The final bits of the message, in the upper portion of the
+ *     byte.  (Use 0b###00000 instead of 0b00000### to input the
+ *     three bits ###.)
+ *   length: [in]
+ *     The number of bits in message_bits, between 1 and 7.
+ *
+ * Returns:
+ *   sha Error Code.
+ */
+int hmacFinalBits(HMACContext *context,
+    uint8_t bits, unsigned int bit_count)
+{
+  if (!context) return shaNull;
+  if (context->Corrupted) return context->Corrupted;
+  if (context->Computed) return context->Corrupted = shaStateError;
+  /* then final bits of datagram */
+  return context->Corrupted =
+    USHAFinalBits(&context->shaContext, bits, bit_count);
+}
+
+/*
+ * hmacResult
+ *
+ * Description:
+ *   This function will return the N-byte message digest into the
+ *   Message_Digest array provided by the caller.
+ *
+ * Parameters:
+ *   context: [in/out]
+ *     The context to use to calculate the HMAC hash.
+ *   digest[ ]: [out]
+ *     Where the digest is returned.
+ *     NOTE 2: The length of the hash is determined by the value of
+ *      whichSha that was passed to hmacReset().
+ *
+ * Returns:
+ *   sha Error Code.
+ *
+ */
+int hmacResult(HMACContext *context, uint8_t *digest)
+{
+  int ret;
+  if (!context) return shaNull;
+  if (context->Corrupted) return context->Corrupted;
+  if (context->Computed) return context->Corrupted = shaStateError;
+
+  /* finish up 1st pass */
+  /* (Use digest here as a temporary buffer.) */
+  ret =
+    USHAResult(&context->shaContext, digest) ||
+         /* perform outer SHA */
+         /* init context for 2nd pass */
+         USHAReset(&context->shaContext, context->whichSha) ||
+
+         /* start with outer pad */
+         USHAInput(&context->shaContext, context->k_opad,
+                   context->blockSize) ||
+
+         /* then results of 1st hash */
+         USHAInput(&context->shaContext, digest, context->hashSize) ||
+         /* finish up 2nd pass */
+         USHAResult(&context->shaContext, digest);
+
+  context->Computed = 1;
+  return context->Corrupted = ret;
+}
+
+/* replace a hex string in place with its value */
+int unhexStr(char *hexstr)
+{
+  char *o = hexstr;
+  int len = 0, nibble1 = 0, nibble2 = 0;
+  if (!hexstr) return 0;
+  for ( ; *hexstr; hexstr++) {
+    if (isalpha((int)(unsigned char)(*hexstr))) {
+      nibble1 = tolower((int)(unsigned char)(*hexstr)) - 'a' + 10;
+    } else if (isdigit((int)(unsigned char)(*hexstr))) {
+      nibble1 = *hexstr - '0';
+  } else {
+      printf("\nError: bad hex character '%c'\n", *hexstr);
+    }
+    if (!*++hexstr) break;
+    if (isalpha((int)(unsigned char)(*hexstr))) {
+      nibble2 = tolower((int)(unsigned char)(*hexstr)) - 'a' + 10;
+    } else if (isdigit((int)(unsigned char)(*hexstr))) {
+      nibble2 = *hexstr - '0';
+    } else {
+      printf("\nError: bad hex character '%c'\n", *hexstr);
+    }
+    *o++ = (char)((nibble1 << 4) | nibble2);
+    len++;
+  }
+  return len;
+}
  
+
 int main() {
 
-  printf("testing: %s\n", "TESTING!\n");
-  char output1[64] = "1CFFE26786771001CF767FC7C0CE1C3029060238D3225EA0C9EDE740954EA892";
-  testInput("TESTING!", (char*)output1, 8);
 
-  printf("testing: %s\n", "abc");
-  char output2[64] = "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD";
-  testInput("abc", (char*)output2, 3);
+//   printf("testing: %s\n", "TESTING!\n");
+//   char output1[64] = "1CFFE26786771001CF767FC7C0CE1C3029060238D3225EA0C9EDE740954EA892";
+//   testInput("TESTING!", (char*)output1, 8);
 
-  printf("testing: %s\n", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
-  char output3[64] = "248D6A61D20638B8E5C026930C3E6039A33CE45964FF2167F6ECEDD419DB06C1";
-  testInput("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", output3, 56);
+//   printf("testing: %s\n", "abc");
+//   char output2[64] = "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD";
+//   testInput("abc", (char*)output2, 3);
 
-  printf("testing: %s\n", "asdfj8;lkas");
-  char output4[64] = "C252FBD383BE8A9BC8F66FB5EFE850E18F42AE94DB963417ADF3C8694358580A";
-  testInput("asdfj8;lkas", (char*)output4, 11);
+//   printf("testing: %s\n", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+//   char output3[64] = "248D6A61D20638B8E5C026930C3E6039A33CE45964FF2167F6ECEDD419DB06C1";
+//   testInput("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", output3, 56);
+
+//   printf("testing: %s\n", "asdfj8;lkas");
+//   char output4[64] = "C252FBD383BE8A9BC8F66FB5EFE850E18F42AE94DB963417ADF3C8694358580A";
+//   testInput("asdfj8;lkas", (char*)output4, 11);
 
   return 0;
 }
